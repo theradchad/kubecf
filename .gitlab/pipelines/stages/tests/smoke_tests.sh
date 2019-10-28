@@ -4,6 +4,8 @@ set -o errexit -o nounset
 
 # shellcheck disable=SC1090
 source "$(bazel info workspace)/.gitlab/pipelines/config/config.sh"
+# shellcheck disable=SC1090
+source "$(bazel info workspace)/.gitlab/pipelines/config/kind_kubeconfig.sh"
 
 # Trigger smoke-tests.
 bazel run //testing/smoke_tests

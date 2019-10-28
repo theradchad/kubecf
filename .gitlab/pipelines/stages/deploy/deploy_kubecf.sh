@@ -5,6 +5,8 @@ set -o errexit -o nounset
 # shellcheck disable=SC1090
 source "$(bazel info workspace)/.gitlab/pipelines/config/config.sh"
 # shellcheck disable=SC1090
+source "$(bazel info workspace)/.gitlab/pipelines/config/kind_kubeconfig.sh"
+# shellcheck disable=SC1090
 source "$(bazel info workspace)/.gitlab/pipelines/stages/build/output_chart.sh"
 
 # Create a values.yaml for the test.

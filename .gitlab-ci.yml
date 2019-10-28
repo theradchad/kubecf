@@ -1,14 +1,19 @@
 # Dockerfile source - https://github.com/f0rmiga/bazel-docker-image.
-image: thulioassis/bazel-docker-image:0.29.1
+image: thulioassis/kubecf-ci:latest
+
+services:
+- name: docker:18.09-dind
+
+variables:
+  DOCKER_TLS_CERTDIR: ""
+  DOCKER_HOST: tcp://localhost:2375
+  DOCKER_DRIVER: overlay2
 
 stages:
 - lint
 - build
-- cleanup:pre
-- deploy
-- tests
+- test
 - publish
-- cleanup:post
 
 lint:
   stage: lint
@@ -30,31 +35,17 @@ build:chart:
     - output/scf-*.tgz
     expire_in: 1 week
 
-# Ensure the cluster is clean.
-cleanup:pre:
-  stage: cleanup:pre
+smoke-tests:
+  stage: test
   only:
   - external_pull_requests
   - master
   script:
-  - .gitlab/pipelines/stages/cleanup.sh
-
-deploy:
-  stage: deploy
-  only:
-  - external_pull_requests
-  - master
-  script:
+  - .gitlab/pipelines/stages/deploy/setup.sh
   - .gitlab/pipelines/stages/deploy/deploy_cf_operator.sh
+  - .gitlab/pipelines/stages/deploy/wait_cf_operator.sh
   - .gitlab/pipelines/stages/deploy/deploy_kubecf.sh
-  - .gitlab/pipelines/stages/deploy/wait.sh
-
-tests:smoke:
-  stage: tests
-  only:
-  - external_pull_requests
-  - master
-  script:
+  - .gitlab/pipelines/stages/deploy/wait_kubecf.sh
   - .gitlab/pipelines/stages/tests/smoke_tests.sh
 
 publish:chart:
@@ -66,12 +57,3 @@ publish:chart:
     entrypoint: [""]
   script:
   - .gitlab/pipelines/stages/publish.sh
-
-cleanup:post:
-  stage: cleanup:post
-  only:
-  - external_pull_requests
-  - master
-  when: always
-  script:
-  - .gitlab/pipelines/stages/cleanup.sh
