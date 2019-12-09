@@ -1,13 +1,17 @@
-- path: /releases/-
-  type: replace
+- type: replace
+  path: /releases/-
   value:
     name: brain-tests
     url: {{ include "kubecf.releaseURLLookup" (list .Values.releases "brain-tests") }}
     version: v0.0.5
     stemcell: {{ include "kubecf.stemcellLookup" (list .Values.releases "brain-tests") }}
 
-- path: /instance_groups/-
-  type: replace
+- type: replace
+  path: /instance_groups/name=api/jobs/name=cloud_controller_ng/properties/cc/client_max_body_size?
+  value: 1536M
+
+- type: replace
+  path: /instance_groups/-
   value:
     azs:
     - z1
