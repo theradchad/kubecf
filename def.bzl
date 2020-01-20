@@ -170,8 +170,8 @@ project = struct(
     ),
     cf_operator = struct(
         chart = struct(
-            url = "https://s3.amazonaws.com/cf-operators/helm-charts/cf-operator-v1.0.3-0.g5dd886a5.tgz",
-            sha256 = "17f34a4d741b6b653210efece7a894037dbf45d73b2655edc160b8d7a5994065",
+            url = "https://cf-operators.s3.amazonaws.com/helm-charts/cf-operator-v1.0.0-25.g44e320c8.tgz",
+            sha256 = "e9771013b4fc90f2143edc8167c41123bf8199b782b04ca53fb103d35d83c97d",
         ),
     ),
     kubernetes = struct(
