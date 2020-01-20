@@ -1,8 +1,14 @@
 workspace(name = "kubecf")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
-load("//rules/external_binary:def.bzl", "external_binary")
 load(":def.bzl", "project")
+
+local_repository(
+    name = "external_binaries",
+    path = "rules/external_binaries",
+)
+
+load("@external_binaries//:def.bzl", "external_binary")
 
 [external_binary(
     name = name,
