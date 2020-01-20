@@ -3,8 +3,10 @@ package(default_visibility = ["//visibility:public"])
 load("@bazel_gazelle//:def.bzl", "gazelle")
 load("//rules/workspace_status:def.bzl", "workspace_status")
 
-# gazelle:prefix github.com/example/project
-gazelle(name = "gazelle")
+gazelle(
+    name = "gazelle",
+    prefix = "github.com/SUSE/kubecf",
+)
 
 workspace_status(
     name = "workspace_status",
