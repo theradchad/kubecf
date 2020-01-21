@@ -1,6 +1,5 @@
 workspace(name = "kubecf")
 
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 load(":def.bzl", "project")
 
 local_repository(
@@ -20,35 +19,14 @@ local_repository(
     config = config,
 ) for name, config in project.external_binaries.items()]
 
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
+
 [http_archive(
     name = name,
     sha256 = config.sha256,
     urls = [u.format(version = config.version) for u in config.urls],
     strip_prefix = getattr(config, "strip_prefix", "").format(version = config.version),
 ) for name, config in project.bazel_libs.items()]
-
-load("@io_bazel_rules_docker//repositories:repositories.bzl", container_repositories = "repositories")
-
-container_repositories()
-
-load("@io_bazel_rules_docker//repositories:deps.bzl", container_deps = "deps")
-
-container_deps()
-
-load("@io_bazel_rules_go//go:deps.bzl", "go_rules_dependencies", "go_register_toolchains")
-
-go_rules_dependencies()
-
-go_register_toolchains()
-
-# gazelle:repo bazel_gazelle
-load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
-
-gazelle_dependencies()
-
-load("@io_bazel_rules_docker//go:image.bzl", _go_image_repos = "repositories")
-
-_go_image_repos()
 
 load("@rules_python//python:pip.bzl", "pip_repositories", "pip3_import")
 
@@ -124,5 +102,7 @@ load("@rules_gomplate//:repositories.bzl", "gomplate_repositories")
 
 gomplate_repositories()
 
-load("//rules:gazelle.bzl", "gazelle_generated_repositories")
-gazelle_generated_repositories()
+local_repository(
+    name = "credhub_setup",
+    path = "deploy/containers/credhub_setup",
+)

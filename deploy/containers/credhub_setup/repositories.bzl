@@ -1,11 +1,10 @@
 load("@bazel_gazelle//:deps.bzl", "go_repository")
 
-# Regenerate this file with:
+# Regenerate go_repositories with:
 # bazel run //:gazelle -- update-repos \
-#   -to_macro rules/gazelle.bzl%gazelle_generated_repositories \
-#   -from_file=deploy/containers/credhub_setup/go.mod
-
-def gazelle_generated_repositories():
+#   -to_macro repositories.bzl%go_repositories \
+#   -from_file=go.mod
+def go_repositories():
     """
     Declare the repositories of the golang dependencies.
 

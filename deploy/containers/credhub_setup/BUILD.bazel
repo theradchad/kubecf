@@ -1,3 +1,4 @@
+load("@bazel_gazelle//:def.bzl", "gazelle")
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 load("@io_bazel_rules_docker//go:image.bzl", "go_image")
 load(
@@ -6,6 +7,16 @@ load(
     "container_push",
 )
 load("@rules_gomplate//:defs.bzl", "gomplate_library")
+load("@workspace_status//:def.bzl", "workspace_status")
+
+workspace_status(
+    name = "workspace_status",
+)
+
+gazelle(
+    name = "gazelle",
+    prefix = "github.com/SUSE/kubecf/deploy/containers/credhub_setup",
+)
 
 go_library(
     name = "go_default_library",
