@@ -58,11 +58,11 @@ workspace_status = rule(
     attrs = {
         "_status_converter_tmpl": attr.label(
             allow_single_file = True,
-            default = "//rules/workspace_status:status_converter.tmpl.sh",
+            default = "//:status_converter.tmpl.sh",
         ),
         "_status_merger_tmpl": attr.label(
             allow_single_file = True,
-            default = "//rules/workspace_status:status_merger.tmpl.sh",
+            default = "//:status_merger.tmpl.sh",
         ),
         "_jq": attr.label(
             allow_single_file = True,

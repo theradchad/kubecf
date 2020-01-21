@@ -10,6 +10,11 @@ local_repository(
 
 load("@external_binaries//:def.bzl", "external_binary")
 
+local_repository(
+    name = "workspace_status",
+    path = "rules/workspace_status",
+)
+
 [external_binary(
     name = name,
     config = config,

@@ -2,7 +2,7 @@ package(default_visibility = ["//visibility:public"])
 
 load("@bazel_gazelle//:def.bzl", "gazelle")
 load("@external_binaries//:def.bzl", "binary_location")
-load("//rules/workspace_status:def.bzl", "workspace_status")
+load("@workspace_status//:def.bzl", "workspace_status")
 load(":def.bzl", "project")
 
 gazelle(
