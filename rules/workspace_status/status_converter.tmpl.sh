@@ -3,7 +3,7 @@
 # This script converts the Bazel status input file to JSON so it can be consumed easily by other
 # tools.
 
-set -o errexit -o pipefail
+set -o errexit
 
 "{jq}" \
   --raw-input \
