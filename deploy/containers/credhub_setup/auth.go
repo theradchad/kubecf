@@ -40,7 +40,7 @@ func makeHTTPClientWithCA(serverName string, caCert []byte) (*http.Client, error
 
 // authenticate with UAA, returning the access token and refresh token.
 func authenticate(ctx context.Context) (*http.Client, error) {
-	link, err := getCCLinkData()
+	link, err := getCCLinkData(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -82,9 +82,9 @@ type ccInfoData struct {
 	TokenEndpoint         string `json:"token_endpoint"`
 }
 
-func getCCLinkData() (*ccEndpointLinkData, error) {
+func getCCLinkData(ctx context.Context) (*ccEndpointLinkData, error) {
 	var link ccEndpointLinkData
-	err := resolveLink("cloud_controller_https_endpoint", &link)
+	err := resolveLink(ctx, "cloud_controller_https_endpoint", &link)
 	if err != nil {
 		return nil, fmt.Errorf("could not get link: %w", err)
 	}

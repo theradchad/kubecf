@@ -1,5 +1,8 @@
 package main
 
+// secgroup.go contains the code necessary to interact with the CF API to set
+// up default running / staging security groups.
+
 import (
 	"bytes"
 	"context"
@@ -11,6 +14,8 @@ import (
 	"net/url"
 )
 
+// ccEndpointLinkData describes the data returned from the cloud controller BOSH
+// link (ccEntanglementName)
 type ccEndpointLinkData struct {
 	CC struct {
 		InternalServiceHostname string `json:"internal_service_hostname"`
@@ -21,6 +26,7 @@ type ccEndpointLinkData struct {
 	} `json:"cc"`
 }
 
+// securityGroupRule is a single rule in a security group definition
 type securityGroupRule struct {
 	Protocol    string `json:"protocol"`
 	Destination string `json:"destination"`
@@ -29,17 +35,42 @@ type securityGroupRule struct {
 	Description string `json:"description"`
 }
 
+// securityGroupEntity is a security group definition excluding standard
+// metadata
+type securityGroupEntity struct {
+	Name  string              `json:"name"`
+	Rules []securityGroupRule `json:"rules"`
+}
+
+// securityGroupDefinition is a security group definition as returned from the
+// CF API
 type securityGroupDefinition struct {
 	Metadata struct {
 		GUID string `json:"guid"`
 	} `json:"metadata"`
-	Entity struct {
-		Name  string              `json:"name"`
-		Rules []securityGroupRule `json:"rules"`
-	} `json:"entity"`
+	Entity securityGroupEntity `json:"entity"`
 }
 
-func buildSecurityGroup(addrs []string, port string) map[string]interface{} {
+// lifecycleType is the lifecycle phase of of a security group, either
+// lifecycleRunning or lifecycleStaging.
+type lifecycleType string
+
+const (
+	// The name of the security group to create / update
+	securityGroupName = "credhub-internal"
+
+	// The name of the BOSH link
+	ccEntanglementName = "cloud_controller_https_endpoint"
+
+	// The phases for the security group to bind to
+	lifecycleRunning = lifecycleType("running")
+	lifecycleStaging = lifecycleType("staging")
+)
+
+// buildSecurityGroup constructs the security group entity (as required to be
+// uploaded to the CC API) for apps to be able to communicate with CredHub,
+// given the addresses for CredHub and the port it's listening on.
+func buildSecurityGroup(addrs []string, port string) securityGroupEntity {
 	entries := make([]securityGroupRule, 0, len(addrs))
 	for _, addr := range addrs {
 		entries = append(entries, securityGroupRule{
@@ -49,13 +80,11 @@ func buildSecurityGroup(addrs []string, port string) map[string]interface{} {
 			Description: "CredHub service access",
 		})
 	}
-	return map[string]interface{}{
-		"name":  securityGroupName,
-		"rules": entries,
+	return securityGroupEntity{
+		Name:  securityGroupName,
+		Rules: entries,
 	}
 }
-
-const securityGroupName = "credhub-internal"
 
 // getExistingSecurityGroup returns the GUID of the existing security group, if
 // there is one; otherwise, returns the empty string.
@@ -91,6 +120,9 @@ func getExistingSecurityGroup(ctx context.Context, client *http.Client, baseURL 
 	return "", nil
 }
 
+// createOrUpdateSecurityGroup creates a new security group, or updates an
+// existing security group if one already exists.  The security group definition
+// is read from the io.Reader.
 func createOrUpdateSecurityGroup(ctx context.Context, client *http.Client, baseURL *url.URL, contentReader io.Reader) (string, error) {
 	groupID, err := getExistingSecurityGroup(ctx, client, baseURL)
 	if err != nil {
@@ -133,28 +165,35 @@ func createOrUpdateSecurityGroup(ctx context.Context, client *http.Client, baseU
 	return resultingSecurityGroup.Metadata.GUID, nil
 }
 
-func bindDefaultSecurityGroup(ctx context.Context, phase, groupID string, client *http.Client, baseURL *url.URL) error {
+// bindDefaultSecurityGroup binds the security group with the given GUID to both
+// the staging and running lifecycle phases as a default security group (i.e.
+// across all spaces).
+func bindDefaultSecurityGroup(ctx context.Context, lifecycle lifecycleType, groupID string, client *http.Client, baseURL *url.URL) error {
 	bindURL := baseURL.ResolveReference(&url.URL{
-		Path: fmt.Sprintf("/v2/config/%s_security_groups/%s", phase, groupID),
+		Path: fmt.Sprintf("/v2/config/%s_security_groups/%s", lifecycle, groupID),
 	})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, bindURL.String(), nil)
 	if err != nil {
-		return fmt.Errorf("failed to create %s security group request: %w", phase, err)
+		return fmt.Errorf("failed to create %s security group request: %w", lifecycle, err)
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("could not set %s security group: %w", phase, err)
+		return fmt.Errorf("could not set %s security group: %w", lifecycle, err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		return fmt.Errorf("error setting %s security group: %s", phase, resp.Status)
+		return fmt.Errorf("error setting %s security group: %s", lifecycle, resp.Status)
 	}
-	fmt.Printf("Successfully bound %s security group: %s\n", phase, resp.Status)
+	fmt.Printf("Successfully bound %s security group: %s\n", lifecycle, resp.Status)
 	return nil
 }
 
+// setupCredHubApplicationSecurityGroups does all of the work to ensure an
+// appropriate security group exists and is bound to the appropriate lifecycle
+// phases.  It requres the addresses and port that the target (CredHub) is
+// listening on.
 func setupCredHubApplicationSecurityGroups(ctx context.Context, client *http.Client, addrs []string, port int) error {
 	var link ccEndpointLinkData
-	err := resolveLink("cloud_controller_https_endpoint", &link)
+	err := resolveLink(ctx, ccEntanglementName, &link)
 	if err != nil {
 		return fmt.Errorf("could not get CC link: %w", err)
 	}
@@ -178,8 +217,8 @@ func setupCredHubApplicationSecurityGroups(ctx context.Context, client *http.Cli
 		return err
 	}
 
-	for _, phase := range []string{"staging", "running"} {
-		err = bindDefaultSecurityGroup(ctx, phase, groupID, client, baseURL)
+	for _, lifecycle := range []lifecycleType{lifecycleRunning, lifecycleStaging} {
+		err = bindDefaultSecurityGroup(ctx, lifecycle, groupID, client, baseURL)
 		if err != nil {
 			return err
 		}

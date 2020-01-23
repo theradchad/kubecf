@@ -9,13 +9,26 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"time"
 )
+
+// overrideMountRoot is a context key for testing; if the context has this, we
+// prefix the normal kube-mounted paths with it.
+var overrideMountRoot = struct{}{}
+
+//
+func getMountRootFromContext(ctx context.Context) string {
+	if override, ok := ctx.Value(overrideMountRoot).(string); ok {
+		return override
+	}
+	return "/"
+}
 
 // getDeploymentName returns the deployment name, which is embedded in some
 // names and paths.
-func getDeploymentName() (string, error) {
-	deploymentNameBytes, err := ioutil.ReadFile("/run/pod-info/deployment-name")
+func getDeploymentName(ctx context.Context) (string, error) {
+	mountRoot := getMountRootFromContext(ctx)
+	deploymentFileName := filepath.Join(mountRoot, "run/pod-info/deployment-name")
+	deploymentNameBytes, err := ioutil.ReadFile(deploymentFileName)
 	if err != nil {
 		return "", fmt.Errorf("could not read redeployment name: %w", err)
 	}
@@ -23,12 +36,13 @@ func getDeploymentName() (string, error) {
 }
 
 // resolveLink reads the quarks entanglements (BOSH links) data.
-func resolveLink(name string, data interface{}) error {
-	deploymentName, err := getDeploymentName()
+func resolveLink(ctx context.Context, name string, data interface{}) error {
+	mountRoot := getMountRootFromContext(ctx)
+	deploymentName, err := getDeploymentName(ctx)
 	if err != nil {
 		return err
 	}
-	linkPath := filepath.Join("/quarks/link", deploymentName, name, "link.yaml")
+	linkPath := filepath.Join(mountRoot, "quarks/link", deploymentName, name, "link.yaml")
 	linkFile, err := os.Open(linkPath)
 	if err != nil {
 		return fmt.Errorf("could not read link data %s: %w", linkPath, err)
@@ -43,7 +57,7 @@ func resolveLink(name string, data interface{}) error {
 }
 
 func process(ctx context.Context) error {
-	err := setupResolver()
+	err := setupResolver(ctx)
 	if err != nil {
 		return fmt.Errorf("could not set up custom DNS resolver: %w", err)
 	}
@@ -55,7 +69,6 @@ func process(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Got client: %+v\n", client)
 	err = setupCredHubApplicationSecurityGroups(ctx, client, addrs, port)
 	if err != nil {
 		return fmt.Errorf("error setting security groups: %w", err)
@@ -69,8 +82,5 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Could not set up CredHub application security groups: %v", err)
 		os.Exit(1)
-	}
-	for {
-		time.Sleep(24 * time.Hour)
 	}
 }

@@ -1,5 +1,8 @@
 package main
 
+// credhub_info.go contains functions to determine the credhub information
+// (addresses and port) required for our security groups.
+
 import (
 	"context"
 	"errors"
@@ -7,54 +10,8 @@ import (
 	"net"
 	"net/url"
 	"os"
-	"sync"
 	"time"
 )
-
-var customResolver *net.Resolver
-
-// setupResolver overrides the default DNS resolver to a custom one; this should
-// only be called once.
-func setupResolver() error {
-	if customResolver == nil {
-		newResolver, err := getDNSResolver()
-		if err != nil {
-			return err
-		}
-		customResolver = newResolver
-	}
-	net.DefaultResolver = customResolver
-	return nil
-}
-
-// getDNSResolver returns a custom DNS resolver that uses the BOSH-DNS service.
-func getDNSResolver() (*net.Resolver, error) {
-	deploymentName, err := getDeploymentName()
-	if err != nil {
-		return nil, err
-	}
-	nameServer := fmt.Sprintf("%s-bosh-dns", deploymentName)
-	addrs, err := net.LookupHost(nameServer)
-	if err != nil {
-		return nil, fmt.Errorf("could not look up DNS server %s: %w", nameServer, err)
-	}
-	mut := sync.Mutex{}
-	i := 0
-	return &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			mut.Lock()
-			defer mut.Unlock()
-			overrideAddress := net.JoinHostPort(addrs[i], "53")
-			i++
-			if i >= len(addrs) {
-				i = 0
-			}
-			dialer := net.Dialer{}
-			return dialer.DialContext(ctx, "udp", overrideAddress)
-		},
-	}, nil
-}
 
 // credhubLinkData is the quarks entanglement data structure for the credhub link
 type credhubLinkData struct {
@@ -64,21 +21,17 @@ type credhubLinkData struct {
 	} `json:"credhub"`
 }
 
-// resolveCredHubAddrsGiven returns the IP addresses of the credhub service.
+// resolveCredHubAddrsGivenLink returns the IP addresses of the credhub service.
 func resolveCredHubAddrsGivenLink(ctx context.Context, link credhubLinkData) ([]string, error) {
 	credhubURL, err := url.Parse(link.CredHub.InternalURL)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse credhub link URL %s: %w",
 			link.CredHub.InternalURL, err)
 	}
-	resolver, err := getDNSResolver()
-	if err != nil {
-		return nil, fmt.Errorf("could not get DNS resolver: %w", err)
-	}
 	var addrs []string
 	fmt.Fprintf(os.Stderr, "Looking up credhub service %s", credhubURL.Hostname())
 	for {
-		addrs, err = resolver.LookupHost(ctx, credhubURL.Hostname())
+		addrs, err = net.DefaultResolver.LookupHost(ctx, credhubURL.Hostname())
 		var dnsError *net.DNSError
 		if !errors.As(err, &dnsError) {
 			break
@@ -87,8 +40,11 @@ func resolveCredHubAddrsGivenLink(ctx context.Context, link credhubLinkData) ([]
 			// Unexpected DNS error; report and die
 			return nil, fmt.Errorf("error looking up host %s: %w", credhubURL.Hostname(), err)
 		}
+		// If CredHub has not finished starting up, DNS resolution will fail
+		// (even though the credhub service address is fixed); wait a bit and
+		// try again until we succeed (to not blow through our retry quota and
+		// end up in CrashLoopBackoff).
 		fmt.Fprintf(os.Stderr, ".")
-		_ = os.Stderr.Sync()
 		time.Sleep(10 * time.Second)
 	}
 	if err != nil {
@@ -103,7 +59,7 @@ func resolveCredHubAddrsGivenLink(ctx context.Context, link credhubLinkData) ([]
 // resolveCredHubInfo returns the IP addresses of the CredHub service and the port.
 func resolveCredHubInfo(ctx context.Context) ([]string, int, error) {
 	var link credhubLinkData
-	err := resolveLink("credhub", &link)
+	err := resolveLink(ctx, "credhub", &link)
 	if err != nil {
 		return nil, 0, err
 	}
