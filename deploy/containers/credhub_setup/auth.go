@@ -11,7 +11,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"os"
+	"path/filepath"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -39,7 +39,7 @@ func makeHTTPClientWithCA(serverName string, caCert []byte) (*http.Client, error
 }
 
 // authenticate with UAA, returning the access token and refresh token.
-func authenticate(ctx context.Context) (*http.Client, error) {
+func authenticate(ctx context.Context, clientID, clientSecret string) (*http.Client, error) {
 	link, err := getCCLinkData(ctx)
 	if err != nil {
 		return nil, err
@@ -55,14 +55,15 @@ func authenticate(ctx context.Context) (*http.Client, error) {
 	}
 
 	credentialsConfig := clientcredentials.Config{
-		ClientID:     os.Getenv("OAUTH_CLIENT"),
-		ClientSecret: os.Getenv("OAUTH_CLIENT_SECRET"),
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
 		TokenURL:     tokenURL.String(),
 		Scopes:       []string{"cloud_controller.admin"},
 	}
 
 	fmt.Printf("Got UAA token URL: %s\n", tokenURL.String())
-	uaaCABytes, err := ioutil.ReadFile("/run/uaa-ca-cert/ca.crt")
+	certPath := filepath.Join(getMountRootFromContext(ctx), "run/uaa-ca-cert/ca.crt")
+	uaaCABytes, err := ioutil.ReadFile(certPath)
 	if err != nil {
 		return nil, fmt.Errorf("error reading UAA CA certificate: %w", err)
 	}

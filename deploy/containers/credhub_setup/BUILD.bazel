@@ -84,7 +84,14 @@ container_push(
 
 go_test(
     name = "go_default_test",
-    srcs = ["auth_test.go"],
+    srcs = [
+        "auth_test.go",
+        "main_test.go",
+        "secgroup_test.go",
+    ],
     embed = [":go_default_library"],
-    deps = ["@com_github_stretchr_testify//require:go_default_library"],
+    deps = [
+        "@com_github_stretchr_testify//assert:go_default_library",
+        "@com_github_stretchr_testify//require:go_default_library",
+    ],
 )

@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -259,15 +258,13 @@ func TestSetupCredHubApplicationSecurityGroups(t *testing.T) {
 	require.NoError(t, err, "could not convert port number")
 	endpointData.CC.PublicTLS.Port = port
 
-	workDir, err := generateFakeMounts("deployment-name", map[string]interface{}{
-		"cloud_controller_https_endpoint": endpointData,
-	})
-	require.NoError(t, err, "could not set up temporary mount directory")
-	defer func() {
-		require.NoError(t, os.RemoveAll(workDir), "could not remove temporary directory")
-	}()
+	fakeMount, err := generateFakeMount("deployment-name", t)
+	require.NoError(t, err, "could not set up temporary mount directorry")
+	defer fakeMount.cleanup()
+	err = fakeMount.writeLink("cloud_controller_https_endpoint", endpointData)
+	require.NoError(t, err, "could not write fake CC mount")
 
-	ctx := context.WithValue(context.Background(), overrideMountRoot, workDir)
+	ctx := context.WithValue(context.Background(), overrideMountRoot, fakeMount.workDir)
 	client := server.Client()
 
 	err = setupCredHubApplicationSecurityGroups(ctx, client, []string{"1"}, 22)

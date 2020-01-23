@@ -52,7 +52,7 @@ func resolveLink(ctx context.Context, name string, data interface{}) error {
 	if err != nil {
 		return fmt.Errorf("could not read links: %w", err)
 	}
-	fmt.Fprintf(os.Stderr, "Successfully resolved link: %+v\n", data)
+	fmt.Fprintf(os.Stderr, "Successfully resolved link %s\n", name)
 	return nil
 }
 
@@ -65,7 +65,11 @@ func process(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	client, err := authenticate(ctx)
+	client, err := authenticate(
+		ctx,
+		os.Getenv("OAUTH_CLIENT"),
+		os.Getenv("OAUTH_CLIENT_SECRET"),
+	)
 	if err != nil {
 		return err
 	}
